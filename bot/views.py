@@ -135,19 +135,25 @@ class ChatView(View):
         :param request: django request obj
         :return: JsonResponse
         '''
-        queryset = Chat.objects.filter(user_id=User.objects.get(email=request.GET.get('email', None)))
-        if queryset:
-            '''Retrieve the chat lines'''
-            queryset = ChatLine.objects.filter(chat_id=queryset)
-            response = [model_to_dict(line) for line in queryset]
-            HTTP_STATUS = 200
-        else:
-            response = {
-                "status": "failed",
-                "message": "No user exists/Chat history does not exists."
-            }
+        print(request.GET.get('email'))
+        if not User.objects.filter(email=request.GET.get('email')).exists():
+            status = "failed"
+            status_message = "user does not exists"
             HTTP_STATUS = 404
-        return JsonResponse(response, safe=False, status=HTTP_STATUS)
+            response = {
+                "status": status,
+                "message": status_message
+            }
+            return JsonResponse(response, status=HTTP_STATUS)
+        else:
+            # queryset = Chat.objects.get(user_id=User.objects.get(email=request.GET.get('email')))
+            '''Retrieve the chat lines'''
+            chat_lines = ChatLine.objects.filter(
+                chat_id=Chat.objects.get(user_id=User.objects.get(email=request.GET.get('email')))
+            )
+            response = [model_to_dict(line) for line in chat_lines]
+            HTTP_STATUS = 200
+            return JsonResponse(response, safe=False, status=HTTP_STATUS)
 
     def post(self, request):
         '''
@@ -225,22 +231,22 @@ class ChatView(View):
 
     def chatline_db_insert(self, jsonData):
         if not Chat.objects.filter(user_id=User.objects.get(email=jsonData['email'])).exists():
-            newChat = Chat(
-                user_id=User.objects.get(email=jsonData['email']).first()
+            print("Inside chatline_db_create")
+            newChat = Chat.objects.create(
+                user=User.objects.filter(email=jsonData['email']).first()
             )
-            newChat.save()
-            newLine = ChatLine(
+            ChatLine.objects.create(
                 chat_id=Chat.objects.get(id=newChat.id),
-                line_text=jsonData['line_text']
-            )
-            newLine.save()
+                line_text=jsonData['line_text'],
+                is_bot=jsonData['is_bot'] if 'is_bot' in jsonData.keys() else False
+             )
         else:
             queryset = Chat.objects.filter(user_id=User.objects.get(email=jsonData['email'])).first() if 'chat_id' not in jsonData.keys() else Chat.objects.filter(id=jsonData['chat_id']).first()
-            newLine = ChatLine(
+            ChatLine.objects.create(
                 chat_id=queryset.id,
-                line_text=jsonData['line_text']
+                line_text=jsonData['line_text'],
+                is_bot=jsonData['is_bot'] if 'is_bot' in jsonData.keys() else False
             )
-            newLine.save()
 
 
     def delete(self, request):

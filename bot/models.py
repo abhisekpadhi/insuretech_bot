@@ -41,4 +41,5 @@ class ChatLine(models.Model):
         on_delete=models.CASCADE
     )
     line_text = models.TextField()
+    is_bot = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now=True)
