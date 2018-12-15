@@ -5,4 +5,6 @@ from django.views.generic.base import RedirectView
 
 urlpatterns = [
     url(r'^$', views.Home.as_view(), name='Home'),
+    url(r'users/', views.UserView.as_view(), name='UsersView'),
+    url(r'chats/', views.ChatView.as_view(), name='ChatView')
 ]
