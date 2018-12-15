@@ -1,15 +1,14 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
-from django.core import serializers
-from django.shortcuts import render
 from django.views import View
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.http import JsonResponse
 from django.forms import model_to_dict
-from bot.configs import *
 from bot.models import *
 import json
+from bot.tree import Node
+from bot.decision import Decider
 from pprint import pprint
 
 
@@ -106,6 +105,11 @@ class UserView(View):
         return JsonResponse(response, status=HTTP_STATUS)
 
     def delete(self, request):
+        '''
+        Deletes a user
+        :param request: django request obj
+        :return: JsonResponse
+        '''
         jsonData = json.loads(request.body)
         print(jsonData)
         if 'email' not in jsonData.keys():
@@ -162,9 +166,6 @@ class ChatView(View):
         :return: JsonResponse
         '''
         jsonData = json.loads(request.body)
-        status = "unknown"
-        status_message = "unknown"
-        HTTP_STATUS = 200
 
         '''Insert conditions'''
         # if (('chat_id' in jsonData.keys() and 'email' in jsonData.keys()) and (Chat.objects.filter(id=jsonData['chat_id']).exists() or Chat.objects.filter(user_id=User.objects.get(email=jsonData['email'])).exists())):
@@ -229,7 +230,60 @@ class ChatView(View):
         }
         return JsonResponse(response, status=HTTP_STATUS)
 
+    def decide_response(self, context):
+        '''
+        Given a context, decide the response by traversing the decision tree.
+        :param context: dict
+        context = {
+            "user_id": int,
+            "selected_node": int
+        }
+        :return: string
+        '''
+        decider = Decider()
+        node = Node()
+        if decider.is_new_customer(id=context['user_id']):
+            '''Go to the root of the tree'''
+            response = node.read(is_root=True)
+
+            '''Update status'''
+            decider.update_or_create(
+                id=context['user_id'],
+                title=response['title'],
+                node_id=response['id']
+            )
+
+        else:
+            if 'selected_node' not in context:
+                '''Retrieve the context'''
+                status = decider.read(
+                    id=context['user_id'],
+                )
+
+                '''Resume the flow by traversing to the node from the status'''
+                response = node.read(
+                    id=status['funnel']['node_id']
+                )
+
+            else:
+                '''Traverse to next node'''
+                response = node.traverse(
+                    id=context['selected_node']
+                )
+                decider.update_or_create(
+                    id=context['user_id'],
+                    title=response['title'],
+                    node_id=context['selected_node']
+                )
+        return response
+
+
     def chatline_db_insert(self, jsonData):
+        '''
+        Inserts chat messges into db.
+        :param jsonData:
+        :return:
+        '''
         if not Chat.objects.filter(user_id=User.objects.get(email=jsonData['email'])).exists():
             print("Inside chatline_db_create")
             newChat = Chat.objects.create(
@@ -247,7 +301,6 @@ class ChatView(View):
                 line_text=jsonData['line_text'],
                 is_bot=jsonData['is_bot'] if 'is_bot' in jsonData.keys() else False
             )
-
 
     def delete(self, request):
         '''
@@ -282,6 +335,12 @@ class ChatView(View):
         return JsonResponse(response, HTTP_STATUS)
 
     def delete_chat_history(self, chat_id=None, email=None):
+        '''
+        Implements the chat history delete method
+        :param chat_id:
+        :param email:
+        :return:
+        '''
         if chat_id is not None:
             if Chat.objects.filter(id=chat_id).exists():
                 Chat.objects.filter(id=chat_id).delete()
