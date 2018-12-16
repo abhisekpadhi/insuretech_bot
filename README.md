@@ -34,3 +34,14 @@ source venv/bin/activate
 pip install -r requirements
 ```
 
+- Run migrations
+```
+python manage.py makemigrations
+python manage.py migrate
+```
+
+- Start application
+```
+python manage.py runserver localhost:8000
+```
+
