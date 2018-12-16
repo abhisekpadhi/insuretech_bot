@@ -29,7 +29,6 @@ class TreeNode(models.Model):
     priority = models.BigIntegerField(null=True)                            #Reserved for future use
 
 
-
 class Chat(models.Model):
     status = models.CharField(max_length=1024)                              #Not necessary now, using status field of User
     user = models.ForeignKey(
