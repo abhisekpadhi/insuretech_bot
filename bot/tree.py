@@ -1,4 +1,5 @@
 from bot.models import TreeNode
+from django.forms import model_to_dict
 
 class Node:
     def update_or_create(self, **kwargs):
@@ -47,6 +48,29 @@ class Node:
             parent_node=kwargs.get('id')
         )
         return [model_to_dict(node) for node in queryset]
+
+    def is_leaf(self, **kwargs):
+        '''
+        Determines if a node is leaf
+        :return: boolean
+        '''
+        return TreeNode.objects.get(
+            id=kwargs.get('id')
+        ).is_leaf
+
+    def get_parent(self, **kwargs):
+        '''
+        Determines the parent of a given node
+        :param kwargs: node id
+        :return: int
+        '''
+        if TreeNode.objects.get(
+                id=kwargs.get('id')
+        ).is_root:
+            return False
+        return TreeNode.objects.get(
+            id=kwargs.get('id')
+        ).parent_node
 
     def delete(self, **kwargs):
         '''

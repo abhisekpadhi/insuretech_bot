@@ -18,9 +18,9 @@ class User(models.Model):
     status = models.TextField(null=True)
 
 class TreeNode(models.Model):
-    title = models.CharField(max_length=255, null=False, unique=True)
+    title = models.CharField(max_length=255, null=False)
     is_leaf = models.BooleanField(default=False)
-    is_root = models.BooleanField(default=False, unique=True)
+    is_root = models.BooleanField(default=False)
     parent_node = models.BigIntegerField(null=True)
     prompt_text = models.TextField(null=True, blank=True)
     action_template = models.CharField(max_length=1024, null=True)

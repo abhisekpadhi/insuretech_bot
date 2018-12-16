@@ -220,41 +220,62 @@ class ChatView(View):
 
         else:
             status = "success"
-            status_message = "inserted in db"
+            if 'email' in jsonData.keys():
+                user_id = User.objects.get(email=jsonData['email']).id
+            status_message, choices = self.decide_response(
+                context={
+                    "user_email": jsonData['email'],
+                    "user_id": user_id,
+                    "selected_node": jsonData.get('selected_node')
+                }
+            )
+
             HTTP_STATUS = 200
             self.chatline_db_insert(jsonData=jsonData)
 
         response = {
             "status": status,
-            "message": status_message
+            "message": status_message,
+            "choices": choices
         }
+        self.chatline_db_insert(
+            jsonData={
+                "email": jsonData['email'],
+                "is_bot": True,
+                "line_text": json.dumps(status_message)
+            }
+        )
         return JsonResponse(response, status=HTTP_STATUS)
 
     def decide_response(self, context):
         '''
         Given a context, decide the response by traversing the decision tree.
         :param context: dict
-        context = {
-            "user_id": int,
-            "selected_node": int
-        }
+        context = {'selected_node': None, 'user_email': 'avicool000@gmail.com', 'user_id': 1}
         :return: string
         '''
         decider = Decider()
         node = Node()
+        # pprint(context)
         if decider.is_new_customer(id=context['user_id']):
             '''Go to the root of the tree'''
             response = node.read(is_root=True)
 
+            '''Get list of children'''
+            children = node.traverse(
+                id=response[0]['id']
+            )
+
             '''Update status'''
             decider.update_or_create(
-                id=context['user_id'],
-                title=response['title'],
-                node_id=response['id']
+                user_email=context['user_email'],
+                user_id=context['user_id'],
+                treenode_title=response[0]['title'],
+                treenode_id=response[0]['id']
             )
 
         else:
-            if 'selected_node' not in context:
+            if 'selected_node' not in context or context['selected_node'] is None:
                 '''Retrieve the context'''
                 status = decider.read(
                     id=context['user_id'],
@@ -265,17 +286,32 @@ class ChatView(View):
                     id=status['funnel']['node_id']
                 )
 
+                '''Get list of children'''
+                children = node.traverse(
+                    id=response[0]['id']
+                )
+
             else:
-                '''Traverse to next node'''
-                response = node.traverse(
+                '''Read current node'''
+                response = node.read(
                     id=context['selected_node']
                 )
+
+                '''Update context'''
                 decider.update_or_create(
-                    id=context['user_id'],
-                    title=response['title'],
-                    node_id=context['selected_node']
+                    user_email=context['user_email'],
+                    treenode_title=response[0]['title'],
+                    treenode_id=context['selected_node']
                 )
-        return response
+
+                if node.is_leaf(id=response[0]['id']):
+                    children = None
+                else:
+                    '''Get list of children'''
+                    children = node.traverse(
+                        id=response[0]['id']
+                    )
+        return response, children
 
 
     def chatline_db_insert(self, jsonData):
@@ -285,7 +321,6 @@ class ChatView(View):
         :return:
         '''
         if not Chat.objects.filter(user_id=User.objects.get(email=jsonData['email'])).exists():
-            print("Inside chatline_db_create")
             newChat = Chat.objects.create(
                 user=User.objects.filter(email=jsonData['email']).first()
             )
